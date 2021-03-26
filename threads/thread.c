@@ -267,8 +267,8 @@ void thread_awake(int64_t ticks) {
 		t_look = list_entry(e, struct thread, elem);
 	    alarmtime = t_look->to_wakeup;
 		if (ticks >= alarmtime){
-	 		list_remove(t_look);
-			thread_unblock(t_look);
+	 		list_remove(e);
+			thread_unblock(e);
 		}
 		else if (when_to_awake>alarmtime)
 			when_to_awake = alarmtime;
