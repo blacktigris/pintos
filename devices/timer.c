@@ -91,12 +91,9 @@ timer_elapsed (int64_t then) {
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
-	struct thread *cur = thread_current();
+	
 	enum intr_level oldlv = intr_disable();
-	if (cur != idle_thread)
-		cur->status=THREAD_BLOCKED;
-		cur->to_wakeup=start+ticks;
-		list_push_back(sleeping_list, &cur->elem);
+	thread_sleep(start+ticks);
 	intr_set_level(oldlv);
 	/* ASSERT (intr_get_level () == INTR_ON);
 	while (timer_elapsed (start) < ticks)
@@ -134,7 +131,8 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	
 	ticks++;
 	thread_tick ();
-	sturct  
+	if (!list_empty(sleeping_list))
+		thread_awake();
 
 }
 

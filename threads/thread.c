@@ -56,7 +56,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
-
+int64_t when_to_awake;
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -247,6 +247,35 @@ thread_unblock (struct thread *t) {
 	list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
+}
+
+void thread_sleep(int64_t ticks)  {
+	struct thread *cur = thread_current();
+	if (cur != idle_thread)
+		thread_block();
+		cur->to_wakeup=start+ticks;
+ 		list_push_back(sleeping_list, &cur->elem);
+	
+}
+void thread_awake(int64_t ticks) {
+	struct list_elem e= list_head(sleeping_list);
+	struct thread t_look;
+	int64_t alarmtime;
+	while (e != list_tail(sleeping_list)) {
+		t_look = list_entry(e);
+	    alarmtime = t_look->to_wakeup;
+		if (ticks >= alarmtime)
+	 		list_remove(t_look);
+			thread_unblock(t_look);
+		else if when_to_awake>alarmtime
+			when_to_awake = alarmtime;
+		e=list_next(e);
+	}
+
+}
+
+int64_t get_when_to_awake(void) {
+	return when_to_awake;
 }
 
 /* Returns the name of the running thread. */

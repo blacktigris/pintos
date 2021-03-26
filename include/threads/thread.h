@@ -142,5 +142,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+int64_t get_when_to_awake(void);
 
 #endif /* threads/thread.h */
