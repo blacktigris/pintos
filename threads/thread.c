@@ -256,12 +256,14 @@ void thread_sleep(int64_t ticks)  {
 	if (cur != idle_thread) {
 		thread_block();
 		cur->to_wakeup=ticks;
- 		list_push_back(&sleeping_list, &cur->elem);
+ 		list_push_back(&sleeping_list, &(cur->elem));
+		when_to_awake = ticks<when_to_awake ? ticks : when_to_awake;
+
 	}
 }
 void thread_awake(int64_t ticks) {
 	when_to_awake=INT64_MAX;
-	struct list_elem* e= list_head(&sleeping_list);
+	struct list_elem* e= list_begin(&sleeping_list);
 	struct thread* t_look;
 	int64_t alarmtime;
 	while (e != list_end(&sleeping_list)) {
@@ -271,9 +273,11 @@ void thread_awake(int64_t ticks) {
 	 		e=list_remove(e);
 			thread_unblock(t_look);
 		}
-		else if (when_to_awake>alarmtime) {
-			when_to_awake = alarmtime;
+		else {
 			e=list_next(e);
+			if (when_to_awake>alarmtime) {
+			when_to_awake = alarmtime;
+			}
 		}
 	}
 
