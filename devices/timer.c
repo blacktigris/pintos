@@ -131,9 +131,8 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	
 	ticks++;
 	thread_tick ();
-	if (!list_empty(sleeping_list))
-		thread_awake();
-
+	if (get_when_to_awake()<=ticks)
+		thread_awake(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

@@ -250,26 +250,29 @@ thread_unblock (struct thread *t) {
 }
 
 void thread_sleep(int64_t ticks)  {
+
 	struct thread *cur = thread_current();
-	if (cur != idle_thread)
-		thread_block();
-		cur->to_wakeup=start+ticks;
- 		list_push_back(sleeping_list, &cur->elem);
 	
+	if (cur != idle_thread) {
+		thread_block();
+		cur->to_wakeup=ticks;
+ 		list_push_back(&sleeping_list, &cur->elem);
+	}
 }
 void thread_awake(int64_t ticks) {
-	struct list_elem e= list_head(sleeping_list);
-	struct thread t_look;
+	struct list_elem* e= list_head(&sleeping_list);
+	struct thread* t_look;
 	int64_t alarmtime;
-	while (e != list_tail(sleeping_list)) {
-		t_look = list_entry(e);
+	while (e != list_tail(&sleeping_list)) {
+		t_look = list_entry(e, struct thread, elem);
 	    alarmtime = t_look->to_wakeup;
-		if (ticks >= alarmtime)
+		if (ticks >= alarmtime){
 	 		list_remove(t_look);
 			thread_unblock(t_look);
-		else if when_to_awake>alarmtime
+		}
+		else if (when_to_awake>alarmtime)
 			when_to_awake = alarmtime;
-		e=list_next(e);
+		e=list_next(&e);
 	}
 
 }
