@@ -260,6 +260,7 @@ void thread_sleep(int64_t ticks)  {
 	}
 }
 void thread_awake(int64_t ticks) {
+	when_to_awake=INT64_MAX;
 	struct list_elem* e= list_head(&sleeping_list);
 	struct thread* t_look;
 	int64_t alarmtime;
