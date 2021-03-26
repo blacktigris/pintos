@@ -263,16 +263,17 @@ void thread_awake(int64_t ticks) {
 	struct list_elem* e= list_head(&sleeping_list);
 	struct thread* t_look;
 	int64_t alarmtime;
-	while (e != list_tail(&sleeping_list)) {
+	while (e != list_end(&sleeping_list)) {
 		t_look = list_entry(e, struct thread, elem);
 	    alarmtime = t_look->to_wakeup;
 		if (ticks >= alarmtime){
 	 		list_remove(e);
-			thread_unblock(e);
+			thread_unblock(t_look);
 		}
-		else if (when_to_awake>alarmtime)
+		else if (when_to_awake>alarmtime) {
 			when_to_awake = alarmtime;
-		e=list_next(e);
+			e=list_next(e);
+		}
 	}
 
 }
