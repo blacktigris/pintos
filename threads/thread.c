@@ -250,16 +250,16 @@ thread_unblock (struct thread *t) {
 }
 
 void thread_sleep(int64_t ticks)  {
-
+	enum intr_level old_level = intr_disable();
 	struct thread *cur = thread_current();
 	
 	if (cur != idle_thread) {
-		thread_block();
 		cur->to_wakeup=ticks;
  		list_push_back(&sleeping_list, &(cur->elem));
-		when_to_awake = ticks<when_to_awake ? ticks : when_to_awake;
-
+		when_to_awake = (ticks<when_to_awake) ? ticks : when_to_awake;
+		thread_block();
 	}
+	intr_set_level(old_level);
 }
 void thread_awake(int64_t ticks) {
 	when_to_awake=INT64_MAX;
@@ -276,7 +276,7 @@ void thread_awake(int64_t ticks) {
 		else {
 			e=list_next(e);
 			if (when_to_awake>alarmtime) {
-			when_to_awake = alarmtime;
+				when_to_awake = alarmtime;
 			}
 		}
 	}
