@@ -272,7 +272,7 @@ void thread_awake(int64_t ticks) {
 		}
 		else if (when_to_awake>alarmtime)
 			when_to_awake = alarmtime;
-		e=list_next(&e);
+		e=list_next(e);
 	}
 
 }
