@@ -10,6 +10,8 @@ struct semaphore {
 	struct list waiters;        /* List of waiting threads. */
 };
 
+bool cmp_sema_pri(const struct list_elem *a, const struct list_elem *b, void *aux);
+
 void sema_init (struct semaphore *, unsigned value);
 void sema_down (struct semaphore *);
 bool sema_try_down (struct semaphore *);
@@ -32,8 +34,6 @@ bool lock_held_by_current_thread (const struct lock *);
 struct condition {
 	struct list waiters;        /* List of waiting threads. */
 };
-
-bool cmp_sema_pri(struct list_elem *a, struct list_elem *b, void *aux);
 
 void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);

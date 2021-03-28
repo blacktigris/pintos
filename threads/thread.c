@@ -82,6 +82,57 @@ static tid_t allocate_tid (void);
 // setup temporal gdt first.
 static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
+/* compare two threads' priority */
+bool cmp_pri(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	return list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority;
+}
+
+/* refresh the current thread by checking max priority */
+void check_max_pri(void) {
+	if (!list_empty(&ready_list)) 
+		if (thread_get_priority() < list_entry(list_begin(&ready_list), struct thread, elem)->priority)
+			thread_yield();
+}
+
+/* donate priority */
+void danote_pri(void) {
+	struct thread *first = thread_current()->wait_for_lock->holder;
+
+	while (first) {
+		if (first->priority < thread_get_priority())
+			first->priority = thread_get_priority();
+		
+		if (first->wait_for_lock)
+			first = first->wait_for_lock;
+		else
+			break;
+	}
+}
+
+/* remove every donors for certain lock */
+void delete_lock(struct lock *lock) {
+	struct list_elem *first = list_begin(&thread_current()->donors);
+
+	while (first !=list_end(&thread_current()->donors)) {
+		if (list_entry(first, struct thread, donor_elem)->wait_for_lock == lock)
+			first = list_remove(first);
+		else
+			first = list_next(first);
+	}
+}
+
+/* get new priority after rearrange */
+void get_new_pri(void) {
+	thread_current()->priority = thread_current()->backup_pri;
+
+	if (!list_empty(&thread_current()->donors)) {
+		list_sort(&thread_current()->donors, cmp_pri, NULL);
+		struct thread *temp = list_entry(list_begin(&thread_current()->donors), struct thread, donor_elem);
+		if (temp->priority > thread_current()->priority)
+			thread_current()->priority = temp->priority;
+	}
+}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -165,25 +216,6 @@ thread_print_stats (void) {
 			idle_ticks, kernel_ticks, user_ticks);
 }
 
-/* compare two thread priority */
-bool cmp_pri(const struct list_elem *a, const struct list_elem *b, void *aux) {
-	int a_pri = list_entry(a, struct thread, elem) -> priority;
-	int b_pri = list_entry(b, struct thread, elem) -> priority;
-	return a_pri > b_pri;
-}
-
-/* check if first thread of ready list prior to current thread and context switch */ 
-void check_max_priority(void) {
-	struct thread *cur = thread_current();
-	int cur_pri = cur -> priority;
-
-	if (!list_empty(&ready_list)) {
-		struct thread* ready_first = list_entry(list_begin(&ready_list), struct thread, elem);
-		if (cur_pri < ready_first->priority)
-			thread_yield();
-	}
-}
-
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
    and adds it to the ready queue.  Returns the thread identifier
@@ -230,8 +262,7 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
-	if (priority > thread_get_priority()) 
-		thread_yield();
+	check_max_pri();
 
 	return tid;
 }
@@ -266,7 +297,10 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_insert_ordered(&ready_list, &t->elem, &cmp_pri, NULL);
+
+	/* insert thread to ready list in descending of priority */
+	list_insert_ordered(&ready_list, &t->elem, cmp_pri, NULL);
+	
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -366,8 +400,11 @@ thread_yield (void) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
+	
+	/* append thread to ready list in descending priority */
 	if (curr != idle_thread)
-		list_insert_ordered(&ready_list, &curr->elem, &cmp_pri, NULL);
+		list_insert_ordered(&ready_list, &curr->elem, cmp_pri, NULL);
+	
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -375,17 +412,14 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	struct thread *cur = thread_current();
-	cur->priority = new_priority;
+	thread_current ()->priority = new_priority;
 
-	cur->priority = cur->backup_pri;
-	if (!list_empty(&cur->donor)) {
-		struct thread *first_donor = list_entry(list_begin(&cur->donor), struct thread, donor_elem);
-		if (cur->priority < first_donor->priority)
-			cur->priority = first_donor->priority;
-	}
+#ifdef DONATION
+	thread_current()->init_priority = new_priority;
 
-	check_max_priority();
+	get_new_pri();
+#endif
+	check_max_pri();
 }
 
 /* Returns the current thread's priority. */
@@ -483,11 +517,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
-	
-	/* init for inversion priority */
+
 	t->backup_pri = priority;
 	t->wait_for_lock = NULL;
-	list_init(&t->donor);
+	list_init(&t->donors);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

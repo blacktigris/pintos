@@ -92,14 +92,15 @@ struct thread {
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
 	int64_t to_wakeup;					/* time tick to wake up */
+	
+	/* add for inversion priority */
+	int backup_pri;
+	struct lock* wait_for_lock;
+	struct list donors;
+	struct list_elem donor_elem;
+	
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
-
-	/* added for inversion priority */
-	int backup_pri;
-	struct lock *wait_for_lock;
-	struct list donor;
-	struct list_elem donor_elem;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -120,15 +121,18 @@ struct thread {
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
+/*added method */
+bool cmp_pri(const struct list_elem *a, const struct list_elem *b, void *aux);
+void check_max_pri(void);
+void donate_pri(void);
+void delete_lock(struct lock *lock);
+void get_new_pri(void);
+
 void thread_init (void);
 void thread_start (void);
 
 void thread_tick (void);
 void thread_print_stats (void);
-
-/* added function */
-bool cmp_pri(const struct list_elem *a, const struct list_elem *b, void *aux);
-void check_max_priority(void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
