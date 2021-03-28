@@ -190,7 +190,6 @@ lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
-
 	/* for inversion priority */
 	struct thread *cur = thread_current();
 	if (lock->holder) {
@@ -202,7 +201,7 @@ lock_acquire (struct lock *lock) {
 		int cnt = 0;
 		int cur_pri = cur->priority;
 
-		while (cnt < 9) {
+		while (!thread_mlfqs && cnt < 9) {
 			if(!cur->wait_for_lock)
 				break;
 			cur = cur->wait_for_lock->holder;
@@ -247,28 +246,29 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
-
+	
 	lock->holder = NULL;
 
 	struct thread *cur = thread_current();
 	struct list_elem *last_donor = list_end(&cur->donor);
 	struct list_elem *temp = list_begin (&cur->donor);
 	/* remove thread that wait for lock */
-	while (temp != last_donor) {
-		struct thread *temp_thread = list_entry(temp, struct thread, donor_elem);
-		if (temp_thread -> wait_for_lock ==NULL)
-			temp = list_remove(temp);
-		temp = list_next(temp);
-	}
+	if (!thread_mlfqs){
+		while (temp != last_donor) {
+			struct thread *temp_thread = list_entry(temp, struct thread, donor_elem);
+			if (temp_thread -> wait_for_lock ==NULL)
+				temp = list_remove(temp);
+			temp = list_next(temp);
+		}
 	
 	/* refresh the priority after removing */
-	cur->priority = cur->backup_pri;
-	if (!list_empty(&cur->donor)) {
-		struct thread *first_donor = list_entry(list_begin(&cur->donor), struct thread, donor_elem);
-		if (cur->priority < first_donor->priority)
-			cur->priority = first_donor->priority;
+		cur->priority = cur->backup_pri;
+		if (!list_empty(&cur->donor)) {
+			struct thread *first_donor = list_entry(list_begin(&cur->donor), struct thread, donor_elem);
+			if (cur->priority < first_donor->priority)
+				cur->priority = first_donor->priority;
+		}
 	}
-
 	sema_up (&lock->semaphore);
 }
 
