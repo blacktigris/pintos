@@ -95,6 +95,12 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
+	/* added for inversion priority */
+	int backup_pri;
+	struct lock *wait_for_lock;
+	struct list donor;
+	struct list_elem donor_elem;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -120,7 +126,9 @@ void thread_start (void);
 void thread_tick (void);
 void thread_print_stats (void);
 
+/* added function */
 bool cmp_pri(const struct list_elem *a, const struct list_elem *b, void *aux);
+void check_max_priority(void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);

@@ -33,6 +33,8 @@ struct condition {
 	struct list waiters;        /* List of waiting threads. */
 };
 
+bool cmp_sema_pri(struct list_elem *a, struct list_elem *b, void *aux);
+
 void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);

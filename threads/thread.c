@@ -172,6 +172,17 @@ bool cmp_pri(const struct list_elem *a, const struct list_elem *b, void *aux) {
 	return a_pri > b_pri;
 }
 
+/* check if first thread of ready list prior to current thread and context switch */ 
+void check_max_priority(void) {
+	struct thread *cur = thread_current();
+	int cur_pri = cur -> priority;
+
+	if (!list_empty(&ready_list)) {
+		struct thread* ready_first = list_entry(list_begin(&ready_list), struct thread, elem);
+		if (cur_pri < ready_first->priority)
+			thread_yield();
+	}
+}
 
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
@@ -364,13 +375,17 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	struct thread *cur = thread_current();
+	cur->priority = new_priority;
 
-	if (!list_empty(&ready_list)) {
-		struct thread* ready_first = list_entry(list_begin(&ready_list), struct thread, elem);
-		if (new_priority < ready_first->priority)
-			thread_yield();
+	cur->priority = cur->backup_pri;
+	if (!list_empty(&cur->donor)) {
+		struct thread *first_donor = list_entry(list_begin(&cur->donor), struct thread, donor_elem);
+		if (cur->priority < first_donor->priority)
+			cur->priority = first_donor->priority;
 	}
+
+	check_max_priority();
 }
 
 /* Returns the current thread's priority. */
@@ -468,6 +483,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	
+	/* init for inversion priority */
+	t->backup_pri = priority;
+	t->wait_for_lock = NULL;
+	list_init(&t->donor);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
