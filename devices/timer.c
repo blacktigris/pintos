@@ -129,10 +129,18 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	
-	ticks++;
-	thread_tick ();
+	
+	m_incr();
 	if (get_when_to_awake()<=ticks)
 		thread_awake(ticks);
+	if (thread_mlfqs && !(ticks%4))
+		m_priority(thread_current());
+	if (!(ticks%TIMER_FREQ)){
+		m_update();
+		m_load_avg();
+	}
+	ticks++;
+	thread_tick ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

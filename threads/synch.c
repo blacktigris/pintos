@@ -192,11 +192,32 @@ lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
+<<<<<<< HEAD
 
 	if (lock ->holder) {
 		thread_current() ->wait_for_lock = lock;
 		list_insert_ordered(&lock->holder->donors, &thread_current()->donor_elem, cmp_pri, NULL);
 		donate_pri();
+=======
+	/* for inversion priority */
+	struct thread *cur = thread_current();
+	if (lock->holder) {
+		/* if lock holder exist, update waiting list */
+		cur->wait_for_lock = lock;
+		list_insert_ordered(&lock->holder->donor, &cur->donor_elem, &cmp_pri, NULL);
+
+		/* donate priority for holder */
+		int cnt = 0;
+		int cur_pri = cur->priority;
+
+		while (!thread_mlfqs && cnt < 9) {
+			if(!cur->wait_for_lock)
+				break;
+			cur = cur->wait_for_lock->holder;
+			cur->priority = cur_pri;
+		}
+
+>>>>>>> fa7f2b0ce7fa276afc15773b61700903c9142dbe
 	}
 
 	sema_down (&lock->semaphore);
@@ -234,12 +255,35 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
-
+	
 	lock->holder = NULL;
 
+<<<<<<< HEAD
 	delete_lock(lock);
 	get_new_pri();
 
+=======
+	struct thread *cur = thread_current();
+	struct list_elem *last_donor = list_end(&cur->donor);
+	struct list_elem *temp = list_begin (&cur->donor);
+	/* remove thread that wait for lock */
+	if (!thread_mlfqs){
+		while (temp != last_donor) {
+			struct thread *temp_thread = list_entry(temp, struct thread, donor_elem);
+			if (temp_thread -> wait_for_lock ==NULL)
+				temp = list_remove(temp);
+			temp = list_next(temp);
+		}
+	
+	/* refresh the priority after removing */
+		cur->priority = cur->backup_pri;
+		if (!list_empty(&cur->donor)) {
+			struct thread *first_donor = list_entry(list_begin(&cur->donor), struct thread, donor_elem);
+			if (cur->priority < first_donor->priority)
+				cur->priority = first_donor->priority;
+		}
+	}
+>>>>>>> fa7f2b0ce7fa276afc15773b61700903c9142dbe
 	sema_up (&lock->semaphore);
 }
 

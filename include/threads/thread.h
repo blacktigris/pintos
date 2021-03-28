@@ -90,6 +90,8 @@ struct thread {
 	tid_t tid;                          /* Thread identifier. */
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
+	int nice; 							/* nice. */
+	int recent_cpu;						/*recent cpu time*/
 	int priority;                       /* Priority. */
 	int64_t to_wakeup;					/* time tick to wake up */
 	
@@ -159,4 +161,9 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 int64_t get_when_to_awake(void);
 
+void m_priority(struct thread *t);
+void m_recent_cpu(struct thread *t);
+void m_load_avg(void);
+void m_incr(void);
+void m_update(void);
 #endif /* threads/thread.h */
