@@ -90,17 +90,16 @@ struct thread {
 	tid_t tid;                          /* Thread identifier. */
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
-	int nice; 							/* nice. */
-	int recent_cpu;						/*recent cpu time*/
 	int priority;                       /* Priority. */
 	int64_t to_wakeup;					/* time tick to wake up */
-	
-	/* add for inversion priority */
-	int backup_pri;
-	struct lock* wait_for_lock;
-	struct list donors;
-	struct list_elem donor_elem;
-	
+
+	/* * * * * Priority donation * * * * */
+	/* added elements */
+	int init_pri;						/* save initial priority */
+	struct lock *wait_for_lock;			/* lock thread waited for */
+	struct list donors;					/* all donors*/
+	struct list_elem donor_elem;		/* descriptor as donor */
+
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -123,13 +122,15 @@ struct thread {
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-/*added method */
-bool cmp_pri(const struct list_elem *a, const struct list_elem *b, void *aux);
-void check_max_pri(void);
-void donate_pri(void);
-void delete_lock(struct lock *lock);
-void get_new_pri(void);
+/* * * * * Priority Scheduling * * * * */
+/* Added function */ 
+bool cmp_thread_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
+void check_max_priority(void);
 
+/* * * * * Priority Donation * * * * */
+/* added method */
+
+void donate_priority(void);
 void thread_init (void);
 void thread_start (void);
 
@@ -161,9 +162,4 @@ int thread_get_load_avg (void);
 void do_iret (struct intr_frame *tf);
 int64_t get_when_to_awake(void);
 
-void m_priority(struct thread *t);
-void m_recent_cpu(struct thread *t);
-void m_load_avg(void);
-void m_incr(void);
-void m_update(void);
 #endif /* threads/thread.h */

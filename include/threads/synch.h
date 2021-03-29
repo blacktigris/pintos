@@ -9,8 +9,9 @@ struct semaphore {
 	unsigned value;             /* Current value. */
 	struct list waiters;        /* List of waiting threads. */
 };
-
-bool cmp_sema_pri(const struct list_elem *a, const struct list_elem *b, void *aux);
+/* * * * * Synchronization * * * * */
+/* added method */
+bool cmp_sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 void sema_init (struct semaphore *, unsigned value);
 void sema_down (struct semaphore *);
