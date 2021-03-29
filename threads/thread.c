@@ -96,15 +96,48 @@ void check_max_priority(void) {
 }
 
 /* * * * * Priority Donation * * * * */
+/* donate priority */
+
 void donate_priority(void) {
 	struct thread *cur = thread_current();
-	struct thread *lock_holder = cur->wait_for_lock->holder; 
+	struct thread *temp = cur->wait_for_lock->holder;
 
-	if (lock_holder->priority < cur->priority)
-		lock_holder->priority = cur->priority;
-
+	while (temp) {
+		if (temp->priority < cur->priority) {
+			temp->priority = cur->priority;
+		}
+		if (temp->wait_for_lock) {
+			temp = temp->wait_for_lock->holder;
+		}
+		else
+			break;
+	}
 }
 
+void delete_lock(struct lock *lock) {
+	struct thread *cur = thread_current();
+	struct list_elem *temp = list_begin(&cur->donors);
+
+	for (temp; temp != list_end(&cur->donors);) {
+		struct thread *temp_thread = list_entry(temp, struct thread, donor_elem);
+		if (temp_thread->wait_for_lock == lock)
+			temp = list_remove(temp);
+		else
+			temp = list_next(temp);
+	}
+}
+
+void get_new_priority(void) {
+	struct thread *cur = thread_current();
+	cur->priority = cur->init_pri;
+
+	if (!(list_empty(&cur->donors))) {
+		list_sort(&cur->donors, cmp_thread_priority, NULL);
+		struct thread *max_pri = list_entry(list_begin(&cur->donors), struct thread, donor_elem);
+		if (max_pri->priority > cur->priority)
+			cur->priority = max_pri->priority;
+	}
+}
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -390,7 +423,15 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+
+#ifdef DONATION
+	thread_current()->init_pri = new_priority;
+	get_new_priority();
 	check_max_priority();
+#endif
+#ifndef DONATION
+	check_max_priority();
+#endif
 }
 
 /* Returns the current thread's priority. */

@@ -129,8 +129,10 @@ void check_max_priority(void);
 
 /* * * * * Priority Donation * * * * */
 /* added method */
-
 void donate_priority(void);
+void delete_lock(struct lock *lock);
+void get_new_priority(void);
+
 void thread_init (void);
 void thread_start (void);
 
