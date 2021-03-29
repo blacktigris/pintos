@@ -10,6 +10,7 @@
 #include "threads/palloc.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fp.h"
 #include "intrinsic.h"
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -65,6 +66,8 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+
+static int load_avg;
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -185,7 +188,7 @@ thread_start (void) {
 	struct semaphore idle_started;
 	sema_init (&idle_started, 0);
 	thread_create ("idle", PRI_MIN, idle, &idle_started);
-
+	load_avg=0;
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
 
@@ -422,6 +425,7 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+	if (thread_mlfqs) return;
 	thread_current ()->priority = new_priority;
 
 #ifdef DONATION
@@ -443,30 +447,99 @@ thread_get_priority (void) {
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) {
-	/* TODO: Your implementation goes here */
+	enum intr_level old_lv=intr_disable();
+	struct thread *t = thread_current();
+	t-> nice = nice;
+	
+	m_recent_cpu(t);
+	m_priority(t);
+
+	intr_set_level(old_lv);
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	enum intr_level old_lv = intr_disable();
+	int retval = thread_current()->nice;
+	intr_set_level(old_lv);
+	return retval;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	int old_lv = intr_disable();
+	int retval = f2i_near(fimul(load_avg,100));
+	intr_set_level(old_lv);
+	return retval;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
-	/* TODO: Your implementation goes here */
-	return 0;
+	int old_lv = intr_disable();
+	int retval = f2i_near(fimul(thread_current() -> recent_cpu,100));
+	intr_set_level(old_lv);
+	return retval;/* TODO: Your implementation goes here */
 }
 
+/* functions for mlfq scheduler */
+void m_priority(struct thread *t) {
+	
+	if (t != idle_thread) {
+		int rcpu = t -> recent_cpu;
+		int n = t -> nice;
+		t->priority = PRI_MAX - f2i_near(fiadd(fidiv(rcpu, 4) ,n*2));
+	}
+}
+
+void m_recent_cpu(struct thread *t) {
+	if (t != idle_thread) {
+		int rcpu = t->recent_cpu;
+		int nice = t->nice;
+		int twicela=fimul(load_avg,2);
+		t->recent_cpu=fiadd(fmul(fdiv(twicela,fiadd(twicela,1)),rcpu),nice);
+		
+
+	
+	}
+}
+
+void m_load_avg(void) {
+	bool is_idle = thread_current()==idle_thread;
+
+	int ready_threads = is_idle ? list_size(&ready_list) : list_size(&ready_list)+1;
+	load_avg = fmul(fidiv(i2f(59),60),load_avg)+fimul(fidiv(i2f(1),60),ready_threads);
+	
+}
+
+void m_incr(void) {
+	struct thread *cur = thread_current();
+	int rcpu;
+	if (cur != idle_thread) {
+		rcpu = cur -> recent_cpu;
+		cur->recent_cpu = fiadd(rcpu, 1);
+	}
+}
+
+void m_update() {
+	struct thread *t;
+	t = running_thread();
+	m_priority(t);
+	m_recent_cpu(t);
+	for (struct list_elem* e1=list_begin(&ready_list); e1!=list_end(&ready_list); e1=list_next(e1)){
+		t = list_entry(e1, struct thread, elem);
+		m_priority(t);
+		m_recent_cpu(t);
+	}
+	for (struct list_elem *e2 = list_begin(&sleeping_list); e2!=list_end(&sleeping_list); e2=list_next(e2)){
+		t= list_entry(e2, struct thread, elem);
+		m_priority(t);
+		m_recent_cpu(t);
+	}
+	return;
+}
 /* Idle thread.  Executes when no other thread is ready to run.
 
    The idle thread is initially put on the ready list by
@@ -529,6 +602,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	t->nice = 0;
+	t->recent_cpu = 0;
 	
 	/* * * * * Priority Donation * * * * */
 	/* Initialize variables added */

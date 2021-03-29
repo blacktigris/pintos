@@ -203,7 +203,7 @@ lock_acquire (struct lock *lock) {
 
 	/* * * * * Priority Donation * * * * */
 	struct thread *cur = thread_current();
-	if (lock->holder){
+	if (lock->holder && !thread_mlfqs){
 		cur->wait_for_lock = lock;
 		list_insert_ordered(&lock->holder->donors, &cur->donor_elem, cmp_thread_priority, NULL);
 		donate_priority();
@@ -251,9 +251,10 @@ lock_release (struct lock *lock) {
 
 	/* * * * * Priority Donation * * * * */
 	/* remove and update */
-	delete_lock(lock);
-	get_new_priority();
-
+	if (!thread_mlfqs){
+		delete_lock(lock);
+		get_new_priority();
+	}
 	sema_up (&lock->semaphore);
 }
 
